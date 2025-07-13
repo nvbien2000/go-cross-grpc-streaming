@@ -40,7 +40,6 @@ func main() {
 	go func() {
 		for {
 			// close the stream when context is done
-			log.Println("Receiving message from server...")
 			req, err := stream.Recv()
 			if err == io.EOF {
 				log.Println("EOF received")
@@ -48,7 +47,6 @@ func main() {
 				return
 			}
 			if err != nil {
-				log.Println("Error receiving message from server")
 				log.Fatalf("can not receive %v", err)
 			}
 
