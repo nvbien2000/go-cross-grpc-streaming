@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package ping_pong;
+
+option go_package = "/proto";
+
+service PingPong {
+    // Start with parameters
+    rpc Start(Empty) returns (Empty);
+
+    // Ping-pong from server to client (first), then from client to server (second), using bidirectional streaming
+    rpc PingPong(stream PongResp) returns (stream PingReq);
+}
+
+message Empty {}
+
+message PingReq {
+    string message = 1;
+}
+
+message PongResp {
+    string message = 1;
+}
