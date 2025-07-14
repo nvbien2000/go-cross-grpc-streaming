@@ -4,7 +4,10 @@ Recently, we encountered a problem that an action **cannot** be completed under 
 
 <img src="https://github.com/nvbien2000/go-cross-grpc-streaming/raw/main/assets/unary.png" />
 
-And then:
+Fix:
 
 <img src="https://github.com/nvbien2000/go-cross-grpc-streaming/raw/main/assets/cross-communication.png" />
 
+Result:
+
+<img src="https://github.com/nvbien2000/go-cross-grpc-streaming/raw/main/assets/result.png" />

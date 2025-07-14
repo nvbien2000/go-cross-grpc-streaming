@@ -27,14 +27,7 @@ func main() {
 		log.Fatalf("open stream error %v", err)
 	}
 
-	// call Start() rpc IMMEDIATELY to trigger PingPong stream
-	log.Println("Calling Start() RPC to trigger PingPong stream...")
-	_, err = client.Start(context.Background(), &proto.Empty{})
-	if err != nil {
-		log.Fatalf("failed to call Start rpc: %v", err)
-	}
-	log.Println("Start() RPC called successfully")
-
+	// Start listening for messages from server BEFORE calling Start() RPC
 	ctx := stream.Context()
 	done := make(chan bool)
 	go func() {
@@ -63,11 +56,22 @@ func main() {
 		}
 	}()
 
+	// Wait a bit to ensure stream is ready
+	time.Sleep(100 * time.Millisecond)
+
+	// call Start() rpc AFTER stream is ready
+	log.Println("Calling Start() RPC to trigger PingPong stream...")
+	_, err = client.Start(context.Background(), &proto.Empty{})
+	if err != nil {
+		log.Fatalf("failed to call Start rpc: %v", err)
+	}
+	log.Println("Start() RPC called successfully")
+
 	// this goroutine closes done channel if context is done
 	go func() {
 		<-ctx.Done()
-		if err := ctx.Err(); err != nil {
-			log.Println(err)
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			log.Println(ctxErr)
 		}
 		close(done)
 	}()

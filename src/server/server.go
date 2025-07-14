@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"sync"
+	"time"
 
 	"go-cross-grpc-streaming/src/proto"
 
@@ -17,14 +18,17 @@ type Server struct {
 	Mu sync.Mutex
 	// PingPongStream is the single stream
 	PingPongStream proto.PingPong_PingPongServer
-	// PingPongChannel stores the ping-pong channel
-	PingPongChannel chan *proto.PingReq
+	// PingReqChan is used to send ping request from Start() --> PingPong() --> client
+	PingReqChan chan *proto.PingReq
+	// PongRespChan is used to send pong response from client -- PingPong() --> Start()
+	PongRespChan chan *proto.PongResp
 }
 
 // NewServer creates new instance of Server
 func NewServer() *Server {
 	return &Server{
-		PingPongChannel: make(chan *proto.PingReq),
+		PingReqChan:  make(chan *proto.PingReq),
+		PongRespChan: make(chan *proto.PongResp, 10), // Buffer size 10
 	}
 }
 
@@ -40,7 +44,15 @@ func (s *Server) Start(ctx context.Context, req *proto.Empty) (*proto.Empty, err
 		log.Printf("No active PingPong stream")
 	} else {
 		log.Printf("Triggering PingPong stream via channel from Start() RPC")
-		s.PingPongChannel <- &proto.PingReq{Message: "ping from Start to PingPong to client"}
+		s.PingReqChan <- &proto.PingReq{Message: "ping from Start to PingPong to client"}
+
+		// Wait for response from client (with timeout)
+		select {
+		case pongResp := <-s.PongRespChan:
+			log.Printf("Start() received pongResp from client: %v", pongResp)
+		case <-time.After(5 * time.Second):
+			log.Printf("Start() timeout waiting for client response")
+		}
 	}
 
 	log.Println("Start() RPC completed")
@@ -88,12 +100,19 @@ func (s *Server) PingPong(stream proto.PingPong_PingPongServer) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		// PingPong stream triggered by Start method
-		case pingReq := <-s.PingPongChannel:
+		case pingReq := <-s.PingReqChan:
 			log.Println("PingPong stream triggered by Start method")
 			stream.Send(pingReq)
 		// Received message from client
 		case pongResp := <-clientMsgChan:
 			log.Printf("received new pongResp=%v from client", pongResp)
+			// Forward to Start() method if it's waiting
+			select {
+			case s.PongRespChan <- pongResp:
+				log.Printf("Forwarded pongResp to Start() method")
+			default:
+				log.Printf("No Start() method waiting for response, pongResp dropped")
+			}
 		// Error from client
 		case err := <-clientErrChan:
 			if err.Error() == "EOF" {
