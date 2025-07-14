@@ -2,11 +2,9 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net"
 	"sync"
-	"time"
 
 	"go-cross-grpc-streaming/src/proto"
 
@@ -20,13 +18,13 @@ type Server struct {
 	// PingPongStream is the single stream
 	PingPongStream proto.PingPong_PingPongServer
 	// PingPongChannel stores the ping-pong channel
-	PingPongChannel chan struct{}
+	PingPongChannel chan *proto.PingReq
 }
 
 // NewServer creates new instance of Server
 func NewServer() *Server {
 	return &Server{
-		PingPongChannel: make(chan struct{}),
+		PingPongChannel: make(chan *proto.PingReq),
 	}
 }
 
@@ -42,7 +40,7 @@ func (s *Server) Start(ctx context.Context, req *proto.Empty) (*proto.Empty, err
 		log.Printf("No active PingPong stream")
 	} else {
 		log.Printf("Triggering PingPong stream via channel from Start() RPC")
-		s.PingPongChannel <- struct{}{}
+		s.PingPongChannel <- &proto.PingReq{Message: "ping from Start to PingPong to client"}
 	}
 
 	log.Println("Start() RPC completed")
@@ -90,12 +88,9 @@ func (s *Server) PingPong(stream proto.PingPong_PingPongServer) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		// PingPong stream triggered by Start method
-		case <-s.PingPongChannel:
+		case pingReq := <-s.PingPongChannel:
 			log.Println("PingPong stream triggered by Start method")
-			currTime := time.Now().Format(time.RFC3339)
-			stream.Send(&proto.PingReq{
-				Message: fmt.Sprintf("Ping from server at %s", currTime),
-			})
+			stream.Send(pingReq)
 		// Received message from client
 		case pongResp := <-clientMsgChan:
 			log.Printf("received new pongResp=%v from client", pongResp)
